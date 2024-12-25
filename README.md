@@ -20,6 +20,6 @@ Tested on Linux, Kubuntu KDE plasma 5.
 
 # Images
 
-![alt text](https://raw.githubusercontent.com/andredla/kommand/main/KommandConfig.png)
+![alt text](https://raw.githubusercontent.com/andredla/notifications/main/Notification configuration.png)
 
-![alt text](https://raw.githubusercontent.com/andredla/kommand/main/Kommand.png)
+![alt text](https://raw.githubusercontent.com/andredla/notifications/main/Notification.png)
