@@ -216,7 +216,7 @@ RowLayout {
 																parent.color = plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton;
 																parent.border.color = plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder;
 														}
-														onClicked: notificationHeading.configureClicked()
+														onClicked: parent.parent.clicked()
 													}
             }
             PlasmaCore.IconItem {
@@ -254,7 +254,7 @@ RowLayout {
 																parent.color = plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton;
 																parent.border.color = plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder;
 														}
-														onClicked: notificationHeading.dismissClicked()
+														onClicked: parent.parent.clicked()
 													}
             }
             PlasmaCore.IconItem {
@@ -294,7 +294,7 @@ RowLayout {
 																parent.color = plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton;
 																parent.border.color = plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder;
 														}
-														onClicked: notificationHeading.closeClicked()
+														onClicked: parent.parent.clicked()
 													}
             }
 

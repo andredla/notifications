@@ -181,8 +181,7 @@ ColumnLayout {
 																			parent.color = plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton;
 																			parent.border.color = plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder;
 																		}
-		                onClicked: jobItem.jobState === NotificationManager.Notifications.JobStateSuspended ? jobItem.resumeJobClicked()
-		                                                                                                    : jobItem.suspendJobClicked()
+		                onClicked: parent.parent.clicked()
 																	}
 				            }
 				            PlasmaCore.IconItem {
@@ -219,7 +218,7 @@ ColumnLayout {
 																			parent.color = plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton;
 																			parent.border.color = plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder;
 																		}
-																		onClicked: jobItem.killJobClicked()
+																		onClicked: parent.parent.clicked()
 																	}
 				            }
 				            PlasmaCore.IconItem {
@@ -353,6 +352,29 @@ ColumnLayout {
                     otherFileActionsMenu.open(-1, -1);
                 }
             }
+	            // André
+	            Rectangle {
+	            	color: plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton
+	            	implicitWidth: parent.implicitWidth
+	            	implicitHeight: parent.implicitHeight
+	            	border.width: 1
+	            	border.color: plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder
+														MouseArea { 
+															anchors.fill: parent; hoverEnabled: true
+															onEntered: {
+																parent.color = plasmoid.configuration.bgcolorButtonHover ? plasmoid.configuration.bgcolorButtonHover : Style.bgcolorButtonHover;
+																parent.border.color = plasmoid.configuration.bgcolorBorderHover ? plasmoid.configuration.bgcolorBorderHover : Style.bgcolorBorderHover;
+															}
+															onExited: {
+																parent.color = plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton;
+																parent.border.color = plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder;
+															}
+															onClicked: {
+																otherFileActionsMenu.visualParent = parent.parent;
+																otherFileActionsMenu.open(-1, -1);
+															}
+														}
+	            }
 
             PlasmaComponents3.ToolTip {
                 text: parent.Accessible.name
@@ -372,6 +394,26 @@ ColumnLayout {
             height: Math.max(implicitHeight, otherFileActionsButton.implicitHeight)
             text: i18nd("plasma_applet_org.kde.plasma.notifications", "Open")
             onClicked: jobItem.openUrl(jobItem.url)
+            // André
+            Rectangle {
+            	color: plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton
+            	implicitWidth: parent.implicitWidth
+            	implicitHeight: parent.implicitHeight
+            	border.width: 1
+            	border.color: plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder
+													MouseArea { 
+														anchors.fill: parent; hoverEnabled: true
+														onEntered: {
+															parent.color = plasmoid.configuration.bgcolorButtonHover ? plasmoid.configuration.bgcolorButtonHover : Style.bgcolorButtonHover;
+															parent.border.color = plasmoid.configuration.bgcolorBorderHover ? plasmoid.configuration.bgcolorBorderHover : Style.bgcolorBorderHover;
+														}
+														onExited: {
+															parent.color = plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton;
+															parent.border.color = plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder;
+														}
+														onClicked: parent.parent.clicked()
+													}
+            }
 
             states: [
                 State {

@@ -537,6 +537,29 @@ PlasmaExtras.Representation {
                                 visible: (model.groupChildrenCount > model.expandedGroupChildrenCount || model.isGroupExpanded)
                                     && delegate.ListView.nextSection !== delegate.ListView.section
                                 onClicked: list.setGroupExpanded(model.index, !model.isGroupExpanded)
+                                // André
+                                Rectangle {
+                                	visible: true
+                                	color: plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton
+                                	implicitWidth: parent.implicitWidth
+                                	implicitHeight: parent.implicitHeight
+                                	border.width: 1
+                                	border.color: plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder
+                                	MouseArea {
+                                		anchors.fill: parent; hoverEnabled: true
+                                		onEntered: {
+                                			parent.color = plasmoid.configuration.bgcolorButtonHover ? plasmoid.configuration.bgcolorButtonHover : Style.bgcolorButtonHover;
+                                			parent.border.color = plasmoid.configuration.bgcolorBorderHover ? plasmoid.configuration.bgcolorBorderHover : Style.bgcolorBorderHover;
+                                		}
+                                		onExited: {
+                                			parent.color = plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton;
+                                			parent.border.color = plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder;
+                                		}
+                                		onClicked: {
+                                			parent.parent.clicked()
+                                		}
+                                	}
+                                }
                             }
 
                             PlasmaCore.SvgItem {

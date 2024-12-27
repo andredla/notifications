@@ -56,5 +56,25 @@ RowLayout {
               || i18ndc("plasma_applet_org.kde.plasma.notifications", "@action:button", "Send")
         enabled: replyTextField.length > 0
         onClicked: replyRow.replied(replyTextField.text)
+        // André
+        Rectangle {
+        	color: plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton
+        	implicitWidth: parent.implicitWidth
+        	implicitHeight: parent.implicitHeight
+        	border.width: 1
+        	border.color: plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder
+									MouseArea { 
+										anchors.fill: parent; hoverEnabled: true
+										onEntered: {
+											parent.color = plasmoid.configuration.bgcolorButtonHover ? plasmoid.configuration.bgcolorButtonHover : Style.bgcolorButtonHover;
+											parent.border.color = plasmoid.configuration.bgcolorBorderHover ? plasmoid.configuration.bgcolorBorderHover : Style.bgcolorBorderHover;
+										}
+										onExited: {
+											parent.color = plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton;
+											parent.border.color = plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder;
+										}
+										onClicked: parent.parent.clicked()
+									}
+        }
     }
 }
