@@ -26,7 +26,6 @@ ColumnLayout {
     property alias suspendable: suspendButton.visible
     property alias killable: killButton.visible
 
-    property bool hovered
     property QtObject jobDetails
 
     readonly property int totalFiles: jobItem.jobDetails && jobItem.jobDetails.totalFiles || 0
@@ -153,6 +152,16 @@ ColumnLayout {
                            && (jobItem.jobDetails.processedBytes === 0 || jobItem.jobDetails.totalBytes === 0)
                            && jobItem.jobDetails.processedFiles === 0
                            //&& jobItem.jobDetails.processedDirectories === 0
+        }
+
+        PlasmaComponents3.Label {
+            id: progressText
+
+            visible: !progressBar.indeterminate
+            // the || "0" is a workaround for the fact that 0 as number is falsey, and is wrongly considered a missing argument
+            // BUG: 451807
+            text: i18ndc("plasma_applet_org.kde.plasma.notifications", "Percentage of a job", "%1%", jobItem.percentage || "0")
+            Layout.leftMargin: PlasmaCore.Units.smallSpacing
         }
 
         RowLayout {
@@ -318,6 +327,7 @@ ColumnLayout {
 
     Loader {
         Layout.fillWidth: true
+        Layout.preferredHeight: item ? item.implicitHeight : 0
         active: expandButton.checked
         // Loader doesn't reset its height when unloaded, just hide it altogether
         visible: active
@@ -442,6 +452,15 @@ ColumnLayout {
     }
 
     states: [
+        State {
+            when: jobItem.jobState === NotificationManager.Notifications.JobStateRunning
+            PropertyChanges {
+                target: suspendButton
+                // Explicitly set it to false so it unchecks when pausing from applet
+                // and then the job unpauses programmatically elsewhere.
+                checked: false
+            }
+        },
         State {
             when: jobItem.jobState === NotificationManager.Notifications.JobStateSuspended
             PropertyChanges {

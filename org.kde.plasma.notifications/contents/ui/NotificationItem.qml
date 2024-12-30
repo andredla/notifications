@@ -16,10 +16,11 @@ import org.kde.kquickcontrolsaddons 2.0 as KQCAddons
 
 import org.kde.notificationmanager 1.0 as NotificationManager
 
+import org.kde.plasma.private.notifications 2.0 as Notifications
+
 ColumnLayout {
     id: notificationItem
 
-    property bool hovered: false
     property int maximumLineCount: 0
     property alias bodyCursorShape: bodyLabel.cursorShape
 
@@ -43,6 +44,7 @@ ColumnLayout {
 
     // This isn't an alias because TextEdit RichText adds some HTML tags to it
     property string body
+    property string accessibleDescription
     property var icon
     property var urls: []
 
@@ -94,6 +96,7 @@ ColumnLayout {
     signal replied(string text)
     signal openUrl(string url)
     signal fileActionInvoked(QtObject action)
+    signal forceActiveFocusRequested
 
     signal suspendJobClicked
     signal resumeJobClicked
@@ -104,28 +107,35 @@ ColumnLayout {
     // Header
     Item {
         id: headingElement
-        Layout.fillWidth: true
+        Layout.fillWidth: !notificationItem.inGroup
         Layout.preferredHeight: notificationHeading.implicitHeight
         Layout.preferredWidth: notificationHeading.implicitWidth
-        Layout.bottomMargin: -parent.spacing
+        Layout.alignment: notificationItem.inGroup && summaryLabel.lineCount > 1 ? Qt.AlignTop : 0
+        Layout.topMargin: notificationItem.inGroup && summaryLabel.lineCount > 1 ? Math.max(0, (summaryLabelTextMetrics.height - Layout.preferredHeight) / 2) : 0
+        Layout.bottomMargin: notificationItem.inGroup ? 0 : -parent.spacing
 
         PlasmaCore.ColorScope.colorGroup: PlasmaCore.Theme.HeaderColorGroup
         PlasmaCore.ColorScope.inherit: false
 
         PlasmaExtras.PlasmoidHeading {
-            anchors.fill: parent
-
             // André
             leftInset: 0
             rightInset: 0
             topInset: 0
             bottomInset: 0
 
+            // topInset: 0
+            anchors.fill: parent
             visible: !notificationItem.inHistory
+
+            // HACK PlasmoidHeading is a QQC2 Control which accepts left mouse button by default,
+            // which breaks the popup default action mouse handler, cf. QTBUG-89785
+            Component.onCompleted: Notifications.InputDisabler.makeTransparentForInput(this)
         }
 
 				    // André
-				    Layout.topMargin: parent.height * (plasmoid.configuration.coordY ? plasmoid.configuration.coordY : Style.coordY)
+				    // Layout.topMargin: parent.height * (plasmoid.configuration.coordY ? plasmoid.configuration.coordY : Style.coordY)
+				    // Layout.topMargin: 0
 				    Rectangle {
 				    	color: 
 				    	if(notificationPopup){
@@ -149,6 +159,7 @@ ColumnLayout {
             PlasmaCore.ColorScope.inherit: false
 
             inGroup: notificationItem.inGroup
+            inHistory: notificationItem.inHistory
 
             notificationType: notificationItem.notificationType
             jobState: notificationItem.jobState
@@ -163,323 +174,325 @@ ColumnLayout {
     // Everything else that goes below the header
     // This is its own ColumnLayout-within-a-ColumnLayout because it lets us set
     // the left margin once rather than several times, in each of its children
-    ColumnLayout {
+    Item {
         Layout.fillWidth: true
-        Layout.leftMargin: notificationItem.extraSpaceForCriticalNotificationLine
-        spacing: PlasmaCore.Units.smallSpacing
+        Layout.preferredHeight: childrenRect.height
+        Layout.leftMargin: notificationItem.extraSpaceForCriticalNotificationLine + (notificationItem.inGroup || !notificationItem.inHistory ? 0 : notificationItem.spacing)
+
+        Accessible.role: notificationItem.inHistory ? Accessible.NoRole : Accessible.Notification
+        Accessible.name: summaryLabel.text
+        Accessible.description: notificationItem.accessibleDescription
 
         // Notification body
         RowLayout {
-            id: bodyRow
-            Layout.fillWidth: true
+            id: summaryRow
+            anchors {
+                left: parent.left
+                right: notificationItem.inGroup ? parent.right : iconContainer.left
+                rightMargin: notificationItem.inGroup ? 0 : notificationItem.spacing
+            }
+            visible: summaryLabel.text !== ""
 
-            spacing: PlasmaCore.Units.smallSpacing
-
-            ColumnLayout {
+            PlasmaExtras.Heading {
+                id: summaryLabel
                 Layout.fillWidth: true
-                spacing: 0
-
-                RowLayout {
-                    id: summaryRow
-                    Layout.fillWidth: true
-                    visible: summaryLabel.text !== ""
-
-                    PlasmaExtras.Heading {
-                        id: summaryLabel
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: implicitHeight
-                        textFormat: Text.PlainText
-                        maximumLineCount: 3
-                        wrapMode: Text.WordWrap
-                        elide: Text.ElideRight
-                        level: 4
-				                    // André
-				                    color: 
-				                        if(notificationPopup){
-				                            return plasmoid.configuration.fgcolor ? plasmoid.configuration.fgcolor : Style.fgcolor
-				                        }else{
-				                            return PlasmaCore.ColorScope.textColor
-				                        }
-                        // Give it a bit more visual prominence than the app name in the header
-                        type: PlasmaExtras.Heading.Type.Primary
-                        text: {
-                            if (notificationItem.notificationType === NotificationManager.Notifications.JobType) {
-                                if (notificationItem.jobState === NotificationManager.Notifications.JobStateSuspended) {
-                                    if (notificationItem.summary) {
-                                        return i18ndc("plasma_applet_org.kde.plasma.notifications", "Job name, e.g. Copying is paused", "%1 (Paused)", notificationItem.summary);
-                                    }
-                                } else if (notificationItem.jobState === NotificationManager.Notifications.JobStateStopped) {
-                                    if (notificationItem.jobError) {
-                                        if (notificationItem.summary) {
-                                            return i18ndc("plasma_applet_org.kde.plasma.notifications", "Job name, e.g. Copying has failed", "%1 (Failed)", notificationItem.summary);
-                                        } else {
-                                            return i18nd("plasma_applet_org.kde.plasma.notifications", "Job Failed");
-                                        }
-                                    } else {
-                                        if (notificationItem.summary) {
-                                            return i18ndc("plasma_applet_org.kde.plasma.notifications", "Job name, e.g. Copying has finished", "%1 (Finished)", notificationItem.summary);
-                                        } else {
-                                            return i18nd("plasma_applet_org.kde.plasma.notifications", "Job Finished");
-                                        }
-                                    }
+                Layout.preferredHeight: implicitHeight
+                Layout.topMargin: notificationItem.inGroup && lineCount > 1 ? Math.max(0, (headingElement.Layout.preferredHeight - summaryLabelTextMetrics.height) / 2) : 0
+                textFormat: Text.PlainText
+                maximumLineCount: 3
+                wrapMode: Text.WordWrap
+                elide: Text.ElideRight
+                level: 4
+                // André
+                color: 
+                    if(notificationPopup){
+                        return plasmoid.configuration.fgcolor ? plasmoid.configuration.fgcolor : Style.fgcolor
+                    }else{
+                        return PlasmaCore.ColorScope.textColor
+                    }
+                // Give it a bit more visual prominence than the app name in the header
+                type: PlasmaExtras.Heading.Type.Primary
+                text: {
+                    if (notificationItem.notificationType === NotificationManager.Notifications.JobType) {
+                        if (notificationItem.jobState === NotificationManager.Notifications.JobStateSuspended) {
+                            if (notificationItem.summary) {
+                                return i18ndc("plasma_applet_org.kde.plasma.notifications", "Job name, e.g. Copying is paused", "%1 (Paused)", notificationItem.summary);
+                            }
+                        } else if (notificationItem.jobState === NotificationManager.Notifications.JobStateStopped) {
+                            if (notificationItem.jobError) {
+                                if (notificationItem.summary) {
+                                    return i18ndc("plasma_applet_org.kde.plasma.notifications", "Job name, e.g. Copying has failed", "%1 (Failed)", notificationItem.summary);
+                                } else {
+                                    return i18nd("plasma_applet_org.kde.plasma.notifications", "Job Failed");
+                                }
+                            } else {
+                                if (notificationItem.summary) {
+                                    return i18ndc("plasma_applet_org.kde.plasma.notifications", "Job name, e.g. Copying has finished", "%1 (Finished)", notificationItem.summary);
+                                } else {
+                                    return i18nd("plasma_applet_org.kde.plasma.notifications", "Job Finished");
                                 }
                             }
-                            // some apps use their app name as summary, avoid showing the same text twice
-                            // try very hard to match the two
-                            if (notificationItem.summary && notificationItem.summary.toLocaleLowerCase().trim() != notificationItem.applicationName.toLocaleLowerCase().trim()) {
-                                return notificationItem.summary;
-                            }
-                            return "";
                         }
-                        visible: text !== ""
                     }
-
-                    // inGroup headerItem is reparented here
+                    // some apps use their app name as summary, avoid showing the same text twice
+                    // try very hard to match the two
+                    if (notificationItem.summary && notificationItem.summary.toLocaleLowerCase().trim() != notificationItem.applicationName.toLocaleLowerCase().trim()) {
+                        return notificationItem.summary;
+                    }
+                    return "";
                 }
+                visible: text !== ""
 
-                RowLayout {
-                    id: bodyTextRow
-
-                    Layout.fillWidth: true
-                    spacing: PlasmaCore.Units.smallSpacing
-
-                    SelectableLabel {
-                        id: bodyLabel
-                        listViewParent: notificationItem.listViewParent
-                        // FIXME how to assign this via State? target: bodyLabel.Layout doesn't work and just assigning the property doesn't either
-                        Layout.alignment: notificationItem.inGroup ? Qt.AlignTop : Qt.AlignVCenter
-                        Layout.fillWidth: true
-
-                        Layout.maximumHeight: notificationItem.maximumLineCount > 0
-                                            ? (theme.mSize(font).height * notificationItem.maximumLineCount) : -1
-
-                        // HACK RichText does not allow to specify link color and since LineEdit
-                        // does not support StyledText, we have to inject some CSS to force the color,
-                        // cf. QTBUG-81463 and to some extent QTBUG-80354
-                        // text: "<style>a { color: " + PlasmaCore.Theme.linkColor + "; }</style>" + notificationItem.body
-
-                        // André
-                        text:
-                        if(notificationPopup){
-                        	return "<style>a { color: " + (plasmoid.configuration.fgcolor ? plasmoid.configuration.fgcolor : Style.fgcolor) + "; }</style>" + notificationItem.body
-                        	}else{
-                        		return "<style>a { color: " + PlasmaCore.Theme.linkColor + "; }</style>" + notificationItem.body
-                        	}
-
-                        // Cannot do text !== "" because RichText adds some HTML tags even when empty
-                        visible: notificationItem.body !== ""
-                        onClicked: notificationItem.bodyClicked(mouse)
-                        onLinkActivated: Qt.openUrlExternally(link)
-                    }
-
-                    // inGroup iconContainer is reparented here
+                TextMetrics {
+                    id: summaryLabelTextMetrics
+                    font: summaryLabel.font
+                    text: summaryLabel.text
                 }
             }
 
-            Item {
-                id: iconContainer
-
-                Layout.preferredWidth: PlasmaCore.Units.iconSizes.large
-                Layout.preferredHeight: PlasmaCore.Units.iconSizes.large
-                Layout.topMargin: PlasmaCore.Units.smallSpacing
-                Layout.bottomMargin: PlasmaCore.Units.smallSpacing
-
-                visible: iconItem.active
-
-                PlasmaCore.IconItem {
-                    id: iconItem
-                    // don't show two identical icons
-                    readonly property bool active: valid && source != notificationItem.applicationIconSource
-                    anchors.fill: parent
-                    usesPlasmaTheme: false
-                    smooth: true
-                    // don't show a generic "info" icon since this is a notification already
-                    source: notificationItem.icon !== "dialog-information" ? notificationItem.icon : ""
-                    visible: active
-                }
-
-                // JobItem reparents a file icon here for finished jobs with one total file
-            }
+            // inGroup headerItem is reparented here
         }
 
-        // Job progress reporting
-        Loader {
-            id: jobLoader
-            Layout.fillWidth: true
-            active: notificationItem.notificationType === NotificationManager.Notifications.JobType
-            height: item ? item.implicitHeight : 0
-            visible: active
-            sourceComponent: JobItem {
-                iconContainerItem: iconContainer
+        SelectableLabel {
+            id: bodyLabel
 
-                jobState: notificationItem.jobState
-                jobError: notificationItem.jobError
-                percentage: notificationItem.percentage
-                suspendable: notificationItem.suspendable
-                killable: notificationItem.killable
+            readonly property real maximumHeight: theme.mSize(theme.defaultFont).height * notificationItem.maximumLineCount
+            readonly property bool truncated: notificationItem.maximumLineCount > 0 && bodyLabel.implicitHeight > maximumHeight
 
-                jobDetails: notificationItem.jobDetails
-
-                onSuspendJobClicked: notificationItem.suspendJobClicked()
-                onResumeJobClicked: notificationItem.resumeJobClicked()
-                onKillJobClicked: notificationItem.killJobClicked()
-
-                onOpenUrl: notificationItem.openUrl(url)
-                onFileActionInvoked: notificationItem.fileActionInvoked(action)
-
-                hovered: notificationItem.hovered
+            height: truncated ? maximumHeight : implicitHeight
+            anchors {
+                top: summaryRow.bottom
+                topMargin: summaryRow.visible && notificationItem.inGroup && iconContainer.visible ? notificationItem.spacing : 0
+                left: parent.left
+                right: iconContainer.left
+                rightMargin: iconContainer.visible ? notificationItem.spacing : 0
             }
+
+            listViewParent: notificationItem.listViewParent
+            // HACK RichText does not allow to specify link color and since LineEdit
+            // does not support StyledText, we have to inject some CSS to force the color,
+            // cf. QTBUG-81463 and to some extent QTBUG-80354
+            // text: "<style>a { color: " + PlasmaCore.Theme.linkColor + "; }</style>" + notificationItem.body
+
+            // André
+            text:
+            if(notificationPopup){
+            	return "<style>a { color: " + (plasmoid.configuration.fgcolor ? plasmoid.configuration.fgcolor : Style.fgcolor) + "; }</style>" + notificationItem.body
+            	}else{
+            		return "<style>a { color: " + PlasmaCore.Theme.linkColor + "; }</style>" + notificationItem.body
+            	}
+
+            // Cannot do text !== "" because RichText adds some HTML tags even when empty
+            visible: notificationItem.body !== ""
+            onClicked: notificationItem.bodyClicked(mouse)
+            onLinkActivated: Qt.openUrlExternally(link)
         }
 
-        // Actions
         Item {
-            id: actionContainer
-            Layout.fillWidth: true
-            Layout.preferredHeight: Math.max(actionFlow.implicitHeight, replyLoader.height)
-            visible: actionRepeater.count > 0 && actionFlow.parent === this
+            id: iconContainer
 
-            // Notification actions
-            Flow { // it's a Flow so it can wrap if too long
-                id: actionFlow
-                // For a cleaner look, if there is a thumbnail, puts the actions next to the thumbnail strip's menu button
-                parent: thumbnailStripLoader.item ? thumbnailStripLoader.item.actionContainer : actionContainer
-                width: parent.width
-                spacing: PlasmaCore.Units.smallSpacing
-                layoutDirection: Qt.RightToLeft
-                enabled: !replyLoader.active
-                opacity: replyLoader.active ? 0 : 1
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: PlasmaCore.Units.longDuration
-                        easing.type: Easing.InOutQuad
-                    }
-                }
+            width: visible ? iconItem.width : 0
+            height: visible ? Math.max(iconItem.height + notificationItem.spacing * 2, bodyLabel.height + bodyLabel.anchors.topMargin + (notificationItem.inGroup ? 0 : summaryRow.implicitHeight)) : 0
+            anchors {
+                top: notificationItem.inGroup ? bodyLabel.top : parent.top
+                right: parent.right
+            }
+            visible: iconItem.active
 
-                Repeater {
-                    id: actionRepeater
+            PlasmaCore.IconItem {
+                id: iconItem
 
-                    model: {
-                        var buttons = [];
-                        var actionNames = (notificationItem.actionNames || []);
-                        var actionLabels = (notificationItem.actionLabels || []);
-                        // HACK We want the actions to be right-aligned but Flow also reverses
-                        for (var i = actionNames.length - 1; i >= 0; --i) {
-                            buttons.push({
-                                actionName: actionNames[i],
-                                label: actionLabels[i]
-                            });
-                        }
+                width: PlasmaCore.Units.iconSizes.large
+                height: PlasmaCore.Units.iconSizes.large
+                anchors.verticalCenter: parent.verticalCenter
 
-                        if (notificationItem.hasReplyAction) {
-                            buttons.unshift({
-                                actionName: "inline-reply",
-                                label: notificationItem.replyActionLabel || i18nc("Reply to message", "Reply")
-                            });
-                        }
+                // don't show two identical icons
+                readonly property bool active: valid && source != notificationItem.applicationIconSource
 
-                        return buttons;
-                    }
+                usesPlasmaTheme: false
+                smooth: true
+                source: notificationItem.icon
+            }
+        }
+    }
 
-                    PlasmaComponents3.ToolButton {
-                        flat: false
-                        // why does it spit "cannot assign undefined to string" when a notification becomes expired?
-                        text: modelData.label || ""
+    // Job progress reporting
+    Loader {
+        id: jobLoader
+        Layout.fillWidth: true
+        Layout.preferredHeight: item ? item.implicitHeight : 0
+        active: notificationItem.notificationType === NotificationManager.Notifications.JobType
+        visible: active
+        sourceComponent: JobItem {
+            iconContainerItem: iconContainer
 
-                        onClicked: {
-                            if (modelData.actionName === "inline-reply") {
-                                replyLoader.beginReply();
-                                return;
-                            }
-                            notificationItem.actionInvoked(modelData.actionName);
-                        }
-                        // André
-                        Rectangle {
-                        	color: plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton
-                        	implicitWidth: parent.implicitWidth
-                        	implicitHeight: parent.implicitHeight
-                        	border.width: 1
-                        	border.color: plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder
-                        	MouseArea {
-                        		anchors.fill: parent; hoverEnabled: true
-                        		onEntered: {
-                        			parent.color = plasmoid.configuration.bgcolorButtonHover ? plasmoid.configuration.bgcolorButtonHover : Style.bgcolorButtonHover;
-                        			parent.border.color = plasmoid.configuration.bgcolorBorderHover ? plasmoid.configuration.bgcolorBorderHover : Style.bgcolorBorderHover;
-                        		}
-                        		onExited: {
-                        			parent.color = plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton;
-                        			parent.border.color = plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder;
-                        		}
-                        		onClicked: {
-                        			parent.parent.clicked()
-                        		}
-                        	}
-                        }
-                    }
+            jobState: notificationItem.jobState
+            jobError: notificationItem.jobError
+            percentage: notificationItem.percentage
+            suspendable: notificationItem.suspendable
+            killable: notificationItem.killable
+
+            jobDetails: notificationItem.jobDetails
+
+            onSuspendJobClicked: notificationItem.suspendJobClicked()
+            onResumeJobClicked: notificationItem.resumeJobClicked()
+            onKillJobClicked: notificationItem.killJobClicked()
+
+            onOpenUrl: notificationItem.openUrl(url)
+            onFileActionInvoked: notificationItem.fileActionInvoked(action)
+        }
+    }
+
+    // Actions
+    Item {
+        id: actionContainer
+        Layout.fillWidth: true
+        Layout.preferredHeight: childrenRect.height
+        visible: actionRepeater.count > 0 && actionFlow.parent === this
+
+        // Notification actions
+        Flow { // it's a Flow so it can wrap if too long
+            id: actionFlow
+            // For a cleaner look, if there is a thumbnail, puts the actions next to the thumbnail strip's menu button
+            parent: thumbnailStripLoader.item ? thumbnailStripLoader.item.actionContainer : actionContainer
+            width: parent.width
+            spacing: PlasmaCore.Units.smallSpacing
+            layoutDirection: Qt.RightToLeft
+            enabled: !replyLoader.active
+            opacity: replyLoader.active ? 0 : 1
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: PlasmaCore.Units.longDuration
+                    easing.type: Easing.InOutQuad
                 }
             }
 
-            // inline reply field
-            Loader {
-                id: replyLoader
-                width: parent.width
-                height: active ? item.implicitHeight : 0
-                // When there is only one action and it is a reply action, show text field right away
-                active: notificationItem.replying || (notificationItem.hasReplyAction && (notificationItem.actionNames || []).length === 0)
-                visible: active
-                opacity: active ? 1 : 0
-                x: active ? 0 : parent.width
-                Behavior on x {
-                    NumberAnimation {
-                        duration: PlasmaCore.Units.longDuration
-                        easing.type: Easing.InOutQuad
+            Repeater {
+                id: actionRepeater
+
+                model: {
+                    var buttons = [];
+                    var actionNames = (notificationItem.actionNames || []);
+                    var actionLabels = (notificationItem.actionLabels || []);
+                    // HACK We want the actions to be right-aligned but Flow also reverses
+                    for (var i = actionNames.length - 1; i >= 0; --i) {
+                        buttons.push({
+                            actionName: actionNames[i],
+                            label: actionLabels[i]
+                        });
                     }
-                }
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: PlasmaCore.Units.longDuration
-                        easing.type: Easing.InOutQuad
+
+                    if (notificationItem.hasReplyAction) {
+                        buttons.unshift({
+                            actionName: "inline-reply",
+                            label: notificationItem.replyActionLabel || i18nc("Reply to message", "Reply")
+                        });
                     }
+
+                    return buttons;
                 }
 
-                function beginReply() {
-                    notificationItem.replying = true;
+                PlasmaComponents3.ToolButton {
+                    flat: false
+                    // why does it spit "cannot assign undefined to string" when a notification becomes expired?
+                    text: modelData.label || ""
 
-                    plasmoid.nativeInterface.forceActivateWindow(notificationItem.Window.window);
-                    replyLoader.item.activate();
-                }
-
-                sourceComponent: NotificationReplyField {
-                    placeholderText: notificationItem.replyPlaceholderText
-                    buttonIconName: notificationItem.replySubmitButtonIconName
-                    buttonText: notificationItem.replySubmitButtonText
-                    onReplied: notificationItem.replied(text)
-
-                    replying: notificationItem.replying
-                    onBeginReplyRequested: replyLoader.beginReply()
+                    onClicked: {
+                        if (modelData.actionName === "inline-reply") {
+                            replyLoader.beginReply();
+                            return;
+                        }
+                        notificationItem.actionInvoked(modelData.actionName);
+                    }
+                    
+                     // André
+                     Rectangle {
+                     	color: plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton
+                     	implicitWidth: parent.implicitWidth
+                     	implicitHeight: parent.implicitHeight
+                     	border.width: 1
+                     	border.color: plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder
+                     	MouseArea {
+                     		anchors.fill: parent; hoverEnabled: true
+                     		onEntered: {
+                     			parent.color = plasmoid.configuration.bgcolorButtonHover ? plasmoid.configuration.bgcolorButtonHover : Style.bgcolorButtonHover;
+                     			parent.border.color = plasmoid.configuration.bgcolorBorderHover ? plasmoid.configuration.bgcolorBorderHover : Style.bgcolorBorderHover;
+                     		}
+                     		onExited: {
+                     			parent.color = plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton;
+                     			parent.border.color = plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder;
+                     		}
+                     		onClicked: {
+                     			parent.parent.clicked()
+                     		}
+                     	}
+                     }
                 }
             }
         }
 
-        // thumbnails
+        // inline reply field
         Loader {
-            id: thumbnailStripLoader
-            Layout.leftMargin: notificationItem.thumbnailLeftPadding
-            Layout.rightMargin: notificationItem.thumbnailRightPadding
-            // no change in Layout.topMargin to keep spacing to notification text consistent
-            Layout.topMargin: 0
-            Layout.bottomMargin: notificationItem.thumbnailBottomPadding
-            Layout.fillWidth: true
-            active: notificationItem.urls.length > 0
+            id: replyLoader
+            width: parent.width
+            height: active ? item.implicitHeight : 0
+            // When there is only one action and it is a reply action, show text field right away
+            active: notificationItem.replying || (notificationItem.hasReplyAction && (notificationItem.actionNames || []).length === 0)
             visible: active
-            sourceComponent: ThumbnailStrip {
-                leftPadding: -thumbnailStripLoader.Layout.leftMargin
-                rightPadding: -thumbnailStripLoader.Layout.rightMargin
-                topPadding: -notificationItem.thumbnailTopPadding
-                bottomPadding: -thumbnailStripLoader.Layout.bottomMargin
-                urls: notificationItem.urls
-                onOpenUrl: notificationItem.openUrl(url)
-                onFileActionInvoked: notificationItem.fileActionInvoked(action)
+            opacity: active ? 1 : 0
+            x: active ? 0 : parent.width
+            Behavior on x {
+                NumberAnimation {
+                    duration: PlasmaCore.Units.longDuration
+                    easing.type: Easing.InOutQuad
+                }
             }
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: PlasmaCore.Units.longDuration
+                    easing.type: Easing.InOutQuad
+                }
+            }
+
+            function beginReply() {
+                notificationItem.replying = true;
+
+                notificationItem.forceActiveFocusRequested();
+                replyLoader.item.activate();
+            }
+
+            sourceComponent: NotificationReplyField {
+                placeholderText: notificationItem.replyPlaceholderText
+                buttonIconName: notificationItem.replySubmitButtonIconName
+                buttonText: notificationItem.replySubmitButtonText
+                onReplied: notificationItem.replied(text)
+
+                replying: notificationItem.replying
+                onBeginReplyRequested: replyLoader.beginReply()
+            }
+        }
+    }
+
+    // Thumbnails
+    Loader {
+        id: thumbnailStripLoader
+        Layout.leftMargin: notificationItem.thumbnailLeftPadding
+        Layout.rightMargin: notificationItem.thumbnailRightPadding
+        // no change in Layout.topMargin to keep spacing to notification text consistent
+        Layout.topMargin: 0
+        Layout.bottomMargin: notificationItem.thumbnailBottomPadding
+        Layout.fillWidth: true
+        Layout.preferredHeight: item ? item.implicitHeight : 0
+        active: notificationItem.urls.length > 0
+        visible: active
+        sourceComponent: ThumbnailStrip {
+            leftPadding: -thumbnailStripLoader.Layout.leftMargin
+            rightPadding: -thumbnailStripLoader.Layout.rightMargin
+            topPadding: -notificationItem.thumbnailTopPadding
+            bottomPadding: -thumbnailStripLoader.Layout.bottomMargin
+            urls: notificationItem.urls
+            onOpenUrl: notificationItem.openUrl(url)
+            onFileActionInvoked: notificationItem.fileActionInvoked(action)
         }
     }
 
@@ -504,11 +517,6 @@ ColumnLayout {
                 target: bodyLabel.Label
                 alignment: Qt.AlignTop
             }*/
-
-            PropertyChanges {
-                target: iconContainer
-                parent: bodyTextRow
-            }
         }
     ]
 }

@@ -6,11 +6,11 @@ import org.kde.plasma.core 2.0 as PlasmaCore
 
 	QtObject {
 		id: object
-		property real coordX: 0.05
-		property real coordY: 0.1
-		property real width: 0.9
-		property real height: 1.2
-		property real radius: 5
+		property real coordX: 15
+		property real coordY: 15
+		property real width: 1
+		property real height: 1
+		property real radius: 10
 		property bool jobDetail: false
 		property int backgroundHints: PlasmaCore.Types.NoBackground
 		property string bgcolor: theme.textColor //Style.bgcolor

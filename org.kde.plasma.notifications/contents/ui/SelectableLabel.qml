@@ -6,12 +6,11 @@
 */
 
 import QtQuick 2.8
-import QtQuick.Window 2.2
 import QtQuick.Layouts 1.1
 
 import org.kde.plasma.core 2.0 as PlasmaCore
 import org.kde.plasma.components 3.0 as PlasmaComponents3
-import org.kde.kirigami 2.11 as Kirigami
+import org.kde.kirigami 2.20 as Kirigami
 
 import org.kde.plasma.private.notifications 2.0 as Notifications
 
@@ -28,12 +27,11 @@ PlasmaComponents3.ScrollView {
     signal clicked(var mouse)
     signal linkActivated(string link)
 
-    implicitWidth: bodyText.paintedWidth
-    implicitHeight: bodyText.paintedHeight
+    leftPadding: mirrored && !Kirigami.Settings.isMobile ? PlasmaComponents3.ScrollBar.vertical.width : 0
+    rightPadding: !mirrored && !Kirigami.Settings.isMobile ? PlasmaComponents3.ScrollBar.vertical.width : 0
 
     // HACK: workaround for https://bugreports.qt.io/browse/QTBUG-83890
     PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
-    contentWidth: availableWidth
 
     PlasmaComponents3.TextArea {
         id: bodyText
@@ -43,6 +41,9 @@ PlasmaComponents3.ScrollView {
         topPadding: 0
         bottomPadding: 0
 
+        background: null
+        // color: PlasmaCore.Theme.textColor
+
         // André
         color:
             if(notificationPopup){
@@ -51,10 +52,7 @@ PlasmaComponents3.ScrollView {
                 return PlasmaCore.ColorScope.textColor 
             }
 
-        background: Item {}
-        // Work around Qt bug where NativeRendering breaks for non-integer scale factors
-        // https://bugreports.qt.io/browse/QTBUG-67007
-        renderType: Screen.devicePixelRatio % 1 !== 0 ? Text.QtRendering : Text.NativeRendering
+
         // Selectable only when we are in desktop mode
         selectByMouse: !Kirigami.Settings.tabletMode
 

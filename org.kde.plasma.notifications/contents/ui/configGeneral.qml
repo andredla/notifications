@@ -13,7 +13,7 @@ ColumnLayout {
 	property alias cfg_coordX: coordX.text
 	property alias cfg_coordY: coordY.text
 	property alias cfg_width: width.text
-	property alias cfg_heigth: heigth.text
+	property alias cfg_height: height.text
 	property alias cfg_jobDetail: jobDetail.checked
 	property alias cfg_bgcolor: bgcolor.text
 	property alias cfg_fgcolor: fgcolor.text
@@ -80,13 +80,15 @@ ColumnLayout {
 			QtControls.TextField {
 				id: width
 			}
+			visible: false
 		}
 
 		RowLayout {
-			Kirigami.FormData.label: i18n("Heigth:")
+			Kirigami.FormData.label: i18n("Height:")
 			QtControls.TextField {
-				id: heigth
+				id: height
 			}
+			visible: false
 		}
 
 		RowLayout {

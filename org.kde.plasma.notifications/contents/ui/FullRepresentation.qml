@@ -24,25 +24,25 @@ PlasmaExtras.Representation {
     // TODO these should be configurable in the future
     readonly property int dndMorningHour: 6
     readonly property int dndEveningHour: 20
+    readonly property var appletInterface: Plasmoid.self
 
-    implicitWidth: PlasmaCore.Units.gridUnit * 18
-    implicitHeight: PlasmaCore.Units.gridUnit * 24
+    Layout.minimumWidth: PlasmaCore.Units.gridUnit * 12
+    Layout.minimumHeight: PlasmaCore.Units.gridUnit * 12
+    Layout.preferredWidth: PlasmaCore.Units.gridUnit * 18
+    Layout.preferredHeight: PlasmaCore.Units.gridUnit * 24
+    Layout.maximumWidth: PlasmaCore.Units.gridUnit * 80
+    Layout.maximumHeight: PlasmaCore.Units.gridUnit * 40
 
-    Layout.fillHeight: plasmoid.formFactor === PlasmaCore.Types.Vertical
+    Layout.fillHeight: Plasmoid.formFactor === PlasmaCore.Types.Vertical
 
     collapseMarginsHint: true
 
-    // HACK forward focus to the list
-    onActiveFocusChanged: {
-        if (activeFocus) {
-            list.forceActiveFocus();
-        }
-    }
+    Keys.onDownPressed: dndCheck.forceActiveFocus(Qt.TabFocusReason);
 
     Connections {
-        target: plasmoid
+        target: Plasmoid.self
         function onExpandedChanged() {
-            if (plasmoid.expanded) {
+            if (Plasmoid.expanded) {
                 list.positionViewAtBeginning();
                 list.currentIndex = -1;
             }
@@ -74,6 +74,9 @@ PlasmaExtras.Representation {
                     icon.name: "notifications-disabled"
                     checkable: true
                     checked: Globals.inhibited
+
+                    KeyNavigation.down: list
+                    KeyNavigation.tab: list
 
                     // Let the menu open on press
                     onPressed: {
@@ -164,11 +167,11 @@ PlasmaExtras.Representation {
                 }
 
                 PlasmaComponents3.ToolButton {
-                    visible: !(plasmoid.containmentDisplayHints & PlasmaCore.Types.ContainmentDrawsPlasmoidHeading)
+                    visible: !(Plasmoid.containmentDisplayHints & PlasmaCore.Types.ContainmentDrawsPlasmoidHeading)
 
-                    Accessible.name: plasmoid.action("clearHistory").text
+                    Accessible.name: Plasmoid.action("clearHistory").text
                     icon.name: "edit-clear-history"
-                    enabled: plasmoid.action("clearHistory").visible
+                    enabled: Plasmoid.action("clearHistory").visible
                     onClicked: action_clearHistory()
 
                     PlasmaComponents3.ToolTip {
@@ -189,16 +192,20 @@ PlasmaExtras.Representation {
                     }
 
                     var inhibitedUntil = notificationSettings.notificationsInhibitedUntil;
+                    var inhibitedUntilTime = inhibitedUntil.getTime();
                     var inhibitedByApp = notificationSettings.notificationsInhibitedByApplication;
                     var inhibitedByMirroredScreens = notificationSettings.inhibitNotificationsWhenScreensMirrored
                                                         && notificationSettings.screensMirrored;
+                    var dateNow = Date.now();
 
                     var sections = [];
 
                     // Show until time if valid but not if too far int he future
-                    if (!isNaN(inhibitedUntil.getTime()) && inhibitedUntil.getTime() - Date.now() < 100 * 24 * 60 * 60 * 1000 /* 1 year*/) {
-                        sections.push(i18nc("Do not disturb until date", "Until %1",
-                                            KCoreAddons.Format.formatRelativeDateTime(inhibitedUntil, Locale.ShortFormat)));
+                    if (!isNaN(inhibitedUntilTime) && inhibitedUntilTime - dateNow > 0 &&
+                        inhibitedUntilTime - dateNow < 100 * 24 * 60 * 60 * 1000 /* 1 year*/) {
+                        const endTime = KCoreAddons.Format.formatRelativeDateTime(inhibitedUntil, Locale.ShortFormat);
+                        const lowercaseEndTime =  endTime[0] + endTime.slice(1);
+                        sections.push(i18nc("Do not disturb until date", "Automatically ends: %1", lowercaseEndTime));
                     }
 
                     if (inhibitedByApp) {
@@ -232,12 +239,14 @@ PlasmaExtras.Representation {
         id: scrollView
         anchors.fill: parent
         background: null
+        focus: true
         // HACK: workaround for https://bugreports.qt.io/browse/QTBUG-83890
         PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
 
         contentItem: ListView {
             id: list
-            model: historyModel
+            focus: true
+            model: Plasmoid.expanded ? historyModel : null
             currentIndex: -1
 
             topMargin: PlasmaCore.Units.smallSpacing * 2
@@ -245,6 +254,8 @@ PlasmaExtras.Representation {
             leftMargin: PlasmaCore.Units.smallSpacing * 2
             rightMargin: PlasmaCore.Units.smallSpacing * 2
             spacing: PlasmaCore.Units.smallSpacing
+
+            KeyNavigation.up: dndCheck
 
             Keys.onDeletePressed: {
                 var idx = historyModel.index(currentIndex, 0);
@@ -311,43 +322,10 @@ PlasmaExtras.Representation {
 
             highlightMoveDuration: 0
             highlightResizeDuration: 0
-            // Not using PlasmaComponents.Highlight as this is only for indicating keyboard focus
+            // Not using PlasmaExtras.Highlight as this is only for indicating keyboard focus
             highlight: PlasmaCore.FrameSvgItem {
                 imagePath: "widgets/listitem"
                 prefix: "pressed"
-            }
-
-            add: Transition {
-                SequentialAnimation {
-                    PropertyAction { property: "opacity"; value: 0 }
-                    PauseAnimation { duration: PlasmaCore.Units.longDuration }
-                    ParallelAnimation {
-                        NumberAnimation { property: "opacity"; from: 0; to: 1; duration: PlasmaCore.Units.longDuration }
-                        NumberAnimation { property: "height"; from: 0; duration: PlasmaCore.Units.longDuration }
-                    }
-                }
-            }
-            addDisplaced: Transition {
-                NumberAnimation { properties: "y"; duration:  PlasmaCore.Units.longDuration }
-            }
-
-            remove: Transition {
-                id: removeTransition
-                ParallelAnimation {
-                    NumberAnimation { property: "opacity"; to: 0; duration: PlasmaCore.Units.longDuration }
-                    NumberAnimation {
-                        id: removeXAnimation
-                        property: "x"
-                        to: list.width - (scrollView.PlasmaComponents3.ScrollBar.vertical.visible ? PlasmaCore.Units.smallSpacing * 4 : 0)
-                        duration: PlasmaCore.Units.longDuration
-                    }
-                }
-            }
-            removeDisplaced: Transition {
-                SequentialAnimation {
-                    PauseAnimation { duration: PlasmaCore.Units.longDuration }
-                    NumberAnimation { properties: "y"; duration:  PlasmaCore.Units.longDuration }
-                }
             }
 
             // This is so the delegates can detect the change in "isInGroup" and show a separator
@@ -361,6 +339,72 @@ PlasmaExtras.Representation {
                 width: ListView.view.width - PlasmaCore.Units.smallSpacing * 4
                 contentItem: delegateLoader
 
+                // NOTE: The following animations replace the Transitions in the ListView
+                // because they don't work when the items change size during the animation
+                // (showing/hiding the show more/show less button) in that case they will
+                // animate to a wrong position and stay there
+                // see https://bugs.kde.org/show_bug.cgi?id=427894 and QTBUG-110366
+                property real oldY: -1
+                property int oldListCount: -1
+                onYChanged: {
+                    if (oldY < 0 || oldListCount === list.count) {
+                        oldY = y;
+                        return;
+                    }
+                    traslAnim.from = oldY - y;
+                    traslAnim.running = true;
+                    oldY = y;
+                    oldListCount = list.count;
+                }
+                transform: Translate {
+                    id: transl
+                }
+                NumberAnimation {
+                    id: traslAnim
+                    target: transl
+                    properties: "y";
+                    to: 0
+                    duration:  PlasmaCore.Units.longDuration
+                }
+                opacity: 0;
+                ListView.onAdd: appearAnim.restart();
+                Component.onCompleted: {
+                    Qt.callLater(()=>{
+                        if (!appearAnim.running) {
+                            opacity = 1;
+                        }
+                    });
+                    oldListCount = list.count;
+                }
+
+                SequentialAnimation {
+                    id: appearAnim
+                    PropertyAnimation { target: delegate; property: "opacity"; to: 0 }
+                    PauseAnimation { duration:  PlasmaCore.Units.longDuration}
+                    NumberAnimation {
+                        target: delegate
+                        property: "opacity"
+                        from: 0
+                        to: 1
+                        duration:  PlasmaCore.Units.longDuration
+                    }
+                }
+
+                SequentialAnimation {
+                    id: removeAnimation
+                    PropertyAction { target: delegate; property: "ListView.delayRemove"; value: true }
+                    ParallelAnimation {
+                        NumberAnimation { target: delegate; property: "opacity"; to: 0; duration: PlasmaCore.Units.longDuration }
+                        NumberAnimation {
+                            target: transl
+                            property: "x"
+                            to: list.width - (scrollView.PlasmaComponents3.ScrollBar.vertical.visible ? PlasmaCore.Units.smallSpacing * 4 : 0)
+                            duration: PlasmaCore.Units.longDuration
+                        }
+                    }
+                    PropertyAction { target: delegate; property: "ListView.delayRemove"; value: false }
+                }
+
                 draggable: !model.isGroup && model.type != NotificationManager.Notifications.JobType
 
                 onDismissRequested: {
@@ -370,6 +414,7 @@ PlasmaExtras.Representation {
                     if (x < 0) {
                         removeXAnimation.to = -delegate.width;
                     }
+                    removeAnimation.start();
 
                     historyModel.close(historyModel.index(index, 0));
                 }
@@ -392,7 +437,7 @@ PlasmaExtras.Representation {
                             closable: model.closable
                             closeButtonTooltip: i18n("Close Group")
 
-                            onCloseClicked: historyModel.close(historyModel.index(index, 0))
+                            onCloseClicked: historyModel.close(historyModel.index(index, 0));
                             onConfigureClicked: historyModel.configure(historyModel.index(index, 0))
                         }
                     }
@@ -410,13 +455,16 @@ PlasmaExtras.Representation {
                                     width: PlasmaCore.Units.iconSizes.small
                                     visible: model.isInGroup
 
-                                    PlasmaCore.SvgItem {
-                                        elementId: "vertical-line"
-                                        svg: lineSvg
+                                    // Not using the Plasma theme's vertical line SVG because we want something thicker
+                                    // than a hairline, and thickening a thin line SVG does not necessarily look good
+                                    // with all Plasma themes.
+                                    Rectangle {
                                         anchors.horizontalCenter: parent.horizontalCenter
-                                        // Want a thicker than default bar
-                                        width: Math.min(groupLineContainer.width, naturalSize.width * PlasmaCore.Units.devicePixelRatio * 3)
+                                        width: PlasmaCore.Units.devicePixelRatio * 3
                                         height: parent.height
+                                        // TODO: use separator color here, once that color role is implemented
+                                        color: PlasmaCore.Theme.textColor
+                                        opacity: 0.2
                                     }
                                 }
 
@@ -524,6 +572,7 @@ PlasmaExtras.Representation {
                                     }
 
                                     function close() {
+                                        removeAnimation.start();
                                         historyModel.close(historyModel.index(index, 0));
                                     }
                                 }
@@ -571,42 +620,51 @@ PlasmaExtras.Representation {
                                 // property is only atached to the delegate itself (the Loader in our case)
                                 visible: (!model.isInGroup || delegate.ListView.nextSection !== delegate.ListView.section)
                                                 && delegate.ListView.nextSection !== "" // don't show after last item
+                                                && !removeAnimation.running
                             }
                         }
                     }
                 }
             }
-            PlasmaExtras.PlaceholderMessage {
+
+            Loader {
                 anchors.centerIn: parent
                 width: parent.width - (PlasmaCore.Units.largeSpacing * 4)
 
-                text: i18n("No unread notifications")
-                visible: list.count === 0 && NotificationManager.Server.valid
+                active: list.count === 0
+                visible: active
+                asynchronous: true
+
+                sourceComponent: NotificationManager.Server.valid ? noUnreadMessage : notAvailableMessage
             }
 
-            PlasmaExtras.PlaceholderMessage {
-                anchors.centerIn: parent
-                width: parent.width - (PlasmaCore.Units.largeSpacing * 4)
+            Component {
+                id: noUnreadMessage
 
-                text: i18n("Notification service not available")
-                visible: list.count === 0 && !NotificationManager.Server.valid
+                PlasmaExtras.PlaceholderMessage {
+                    anchors.centerIn: parent
+                    width: parent.width
 
-                // TODO: port to using the subtitle property once it exists
-                PlasmaComponents3.Label {
+                    iconName: "checkmark"
+                    text: i18n("No unread notifications")
+                }
+            }
+
+            Component {
+                id: notAvailableMessage
+
+                PlasmaExtras.PlaceholderMessage {
                     // Checking valid to avoid creating ServerInfo object if everything is alright
-                    readonly property NotificationManager.ServerInfo currentOwner: !NotificationManager.Server.valid ? NotificationManager.Server.currentOwner
-                                                                                                                    : null
+                    readonly property NotificationManager.ServerInfo currentOwner: NotificationManager.Server.currentOwner
 
-                    // PlasmaExtras.PlaceholderMessage is internally a ColumnLayout,
-                    // so we can use Layout.whatever properties here
-                    Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
-                    text: currentOwner ? i18nc("Vendor and product name",
-                                        "Notifications are currently provided by '%1 %2'",
-                                        currentOwner.vendor,
-                                        currentOwner.name)
-                                    : ""
-                    visible: currentOwner && currentOwner.vendor && currentOwner.name
+                    anchors.centerIn: parent
+                    width: parent.width
+
+                    iconName: "notifications-disabled"
+                    text: i18n("Notification service not available")
+                    explanation: currentOwner && currentOwner.vendor && currentOwner.name
+                                ? i18nc("Vendor and product name", "Notifications are currently provided by '%1 %2'", currentOwner.vendor, currentOwner.name)
+                                : ""
                 }
             }
         }

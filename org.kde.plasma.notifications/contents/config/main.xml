@@ -7,17 +7,17 @@
   <group name="">
     <entry name="coordX" type="string">
       <label>X.</label>
-      <default>0.05</default>
+      <default>15</default>
     </entry>
     <entry name="coordY" type="string">
       <label>Y.</label>
-      <default>0.1</default>
+      <default>15</default>
     </entry>
     <entry name="width" type="string">
       <label>Width.</label>
-      <default>0.9</default>
+      <default>1</default>
     </entry>
-    <entry name="heigth" type="string">
+    <entry name="height" type="string">
       <label>Height.</label>
       <default>1</default>
     </entry>

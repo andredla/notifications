@@ -23,6 +23,7 @@ import "global"
 RowLayout {
     id: notificationHeading
     property bool inGroup
+    property bool inHistory
     property int notificationType
 
     property var applicationIconSource
@@ -68,7 +69,7 @@ RowLayout {
             notificationHeading.updateAgoText()
         }
     }
-    
+
     PlasmaCore.IconItem {
         id: applicationIconItem
         Layout.preferredWidth: PlasmaCore.Units.iconSizes.small
@@ -86,7 +87,6 @@ RowLayout {
         textFormat: Text.PlainText
         elide: Text.ElideLeft
         maximumLineCount: 2
-        
         // André
         color:
 	        if(notificationPopup){
@@ -94,7 +94,6 @@ RowLayout {
 	        }else{
 	            return PlasmaCore.ColorScope.textColor 
 	        }
-
         text: notificationHeading.applicationName + (notificationHeading.originName ? " · " + notificationHeading.originName : "")
     }
 
@@ -114,20 +113,25 @@ RowLayout {
         opacity: 0.9
         wrapMode: Text.NoWrap
         text: generateRemainingText() || agoText
-        Layout.rightMargin: Math.round(-notificationHeading.spacing / 2)
 
         // Inicio [André]
         color: plasmoid.configuration.bgcolor ? plasmoid.configuration.bgcolor : Style.bgcolor
         // Fim [André]
 
+
         function generateAgoText() {
-            if (!time || isNaN(time.getTime()) || notificationHeading.jobState === NotificationManager.Notifications.JobStateRunning) {
+            if (!time || isNaN(time.getTime())
+                    || notificationHeading.jobState === NotificationManager.Notifications.JobStateRunning
+                    || notificationHeading.jobState === NotificationManager.Notifications.JobStateSuspended) {
                 return "";
             }
 
             var deltaMinutes = Math.floor((Date.now() - time.getTime()) / 1000 / 60);
             if (deltaMinutes < 1) {
-                return "";
+                // "Just now" is implied by
+                return notificationHeading.inHistory
+                    ? i18ndc("plasma_applet_org.kde.plasma.notifications", "Notification was added less than a minute ago, keep short", "Just now")
+                    : "";
             }
 
             // Received less than an hour ago, show relative minutes
@@ -189,139 +193,137 @@ RowLayout {
         }
     }
 
-    RowLayout {
-        id: headerButtonsRow
-        spacing: 0
+    PlasmaComponents3.ToolButton {
+        id: configureButton
+        icon.name: "configure"
+        visible: false
 
-        PlasmaComponents3.ToolButton {
-            id: configureButton
-            icon.name: "configure"
-            visible: false
-            onClicked: notificationHeading.configureClicked()
+        display: PlasmaComponents3.AbstractButton.IconOnly
+        text: notificationHeading.configureActionLabel || i18nd("plasma_applet_org.kde.plasma.notifications", "Configure")
+        Accessible.description: applicationNameLabel.text
 
-            // André
-            Rectangle {
-            	color: plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton
-            	implicitWidth: parent.implicitWidth
-            	implicitHeight: parent.implicitHeight
-				         border.width: 1
-				         border.color: plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder
-													MouseArea { 
-														anchors.fill: parent; hoverEnabled: true
-														onEntered: {
-															parent.color = plasmoid.configuration.bgcolorButtonHover ? plasmoid.configuration.bgcolorButtonHover : Style.bgcolorButtonHover;
-															parent.border.color = plasmoid.configuration.bgcolorBorderHover ? plasmoid.configuration.bgcolorBorderHover : Style.bgcolorBorderHover;
-														}
-														onExited: {
-																parent.color = plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton;
-																parent.border.color = plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder;
-														}
-														onClicked: parent.parent.clicked()
-													}
-            }
-            PlasmaCore.IconItem {
-	            anchors.centerIn: parent
-	            width: units.iconSizes.small
-	            height: width
-	            source: "configure"
-	           }
+        onClicked: notificationHeading.configureClicked()
 
-            PlasmaComponents3.ToolTip {
-                text: notificationHeading.configureActionLabel || i18nd("plasma_applet_org.kde.plasma.notifications", "Configure")
-            }
+        // André
+        Rectangle {
+        	color: plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton
+        	implicitWidth: parent.implicitWidth
+        	implicitHeight: parent.implicitHeight
+         border.width: 1
+         border.color: plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder
+									MouseArea { 
+										anchors.fill: parent; hoverEnabled: true
+										onEntered: {
+											parent.color = plasmoid.configuration.bgcolorButtonHover ? plasmoid.configuration.bgcolorButtonHover : Style.bgcolorButtonHover;
+											parent.border.color = plasmoid.configuration.bgcolorBorderHover ? plasmoid.configuration.bgcolorBorderHover : Style.bgcolorBorderHover;
+										}
+										onExited: {
+												parent.color = plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton;
+												parent.border.color = plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder;
+										}
+										onClicked: parent.parent.clicked()
+									}
         }
 
-        PlasmaComponents3.ToolButton {
-            id: dismissButton
-            icon.name: notificationHeading.dismissed ? "window-restore" : "window-minimize"
-            visible: false
-            onClicked: notificationHeading.dismissClicked()
+        PlasmaComponents3.ToolTip {
+            text: parent.text
+        }
+    }
 
-            // André
-            Rectangle {
-            	color: plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton
-            	implicitWidth: parent.implicitWidth
-            	implicitHeight: parent.implicitHeight
-				         border.width: 1
-				         border.color: plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder
-													MouseArea { 
-														anchors.fill: parent; hoverEnabled: true
-														onEntered: {
-															parent.color = plasmoid.configuration.bgcolorButtonHover ? plasmoid.configuration.bgcolorButtonHover : Style.bgcolorButtonHover;
-															parent.border.color = plasmoid.configuration.bgcolorBorderHover ? plasmoid.configuration.bgcolorBorderHover : Style.bgcolorBorderHover;
-														}
-														onExited: {
-																parent.color = plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton;
-																parent.border.color = plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder;
-														}
-														onClicked: parent.parent.clicked()
-													}
-            }
-            PlasmaCore.IconItem {
-	            anchors.centerIn: parent
-	            width: units.iconSizes.small
-	            height: width
-	            source: notificationHeading.dismissed ? "window-restore" : "window-minimize"
-	           }
+    PlasmaComponents3.ToolButton {
+        id: dismissButton
+        icon.name: notificationHeading.dismissed ? "window-restore" : "window-minimize"
+        visible: false
 
-            PlasmaComponents3.ToolTip {
-                text: notificationHeading.dismissed
-                      ? i18ndc("plasma_applet_org.kde.plasma.notifications", "Opposite of minimize", "Restore")
-                      : i18nd("plasma_applet_org.kde.plasma.notifications", "Minimize")
-            }
+        display: PlasmaComponents3.AbstractButton.IconOnly
+        text: notificationHeading.dismissed
+            ? i18ndc("plasma_applet_org.kde.plasma.notifications", "Opposite of minimize", "Restore")
+            : i18nd("plasma_applet_org.kde.plasma.notifications", "Minimize")
+        Accessible.description: applicationNameLabel.text
+
+        onClicked: notificationHeading.dismissClicked()
+
+        // André
+        Rectangle {
+        	color: plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton
+        	implicitWidth: parent.implicitWidth
+        	implicitHeight: parent.implicitHeight
+         border.width: 1
+         border.color: plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder
+									MouseArea { 
+										anchors.fill: parent; hoverEnabled: true
+										onEntered: {
+											parent.color = plasmoid.configuration.bgcolorButtonHover ? plasmoid.configuration.bgcolorButtonHover : Style.bgcolorButtonHover;
+											parent.border.color = plasmoid.configuration.bgcolorBorderHover ? plasmoid.configuration.bgcolorBorderHover : Style.bgcolorBorderHover;
+										}
+										onExited: {
+												parent.color = plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton;
+												parent.border.color = plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder;
+										}
+										onClicked: parent.parent.clicked()
+									}
         }
 
-        PlasmaComponents3.ToolButton {
-            id: closeButton
-            visible: false
-            icon.name: "window-close"
-            onClicked: notificationHeading.closeClicked()
-            
-            // André
-            Rectangle {
-				        	color: plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton
-									    implicitWidth: parent.implicitWidth
-									    implicitHeight: parent.implicitHeight
-				         border.width: 1
-				         border.color: plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder
-													MouseArea { 
-														anchors.fill: parent; hoverEnabled: true
-														onEntered: {
-															parent.color = plasmoid.configuration.bgcolorButtonHover ? plasmoid.configuration.bgcolorButtonHover : Style.bgcolorButtonHover;
-															parent.border.color = plasmoid.configuration.bgcolorBorderHover ? plasmoid.configuration.bgcolorBorderHover : Style.bgcolorBorderHover;
-														}
-														onExited: {
-																parent.color = plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton;
-																parent.border.color = plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder;
-														}
-														onClicked: parent.parent.clicked()
-													}
+        PlasmaComponents3.ToolTip {
+            text: parent.text
+        }
+    }
+
+    PlasmaComponents3.ToolButton {
+        id: closeButton
+        visible: false
+        icon.name: "window-close"
+
+        display: PlasmaComponents3.AbstractButton.IconOnly
+        text: closeButtonToolTip.text
+        Accessible.description: applicationNameLabel.text
+
+        onClicked: notificationHeading.closeClicked()
+
+        // André
+        Rectangle {
+        	color: plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton
+					    implicitWidth: parent.implicitWidth
+					    implicitHeight: parent.implicitHeight
+         border.width: 1
+         border.color: plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder
+									MouseArea { 
+										anchors.fill: parent; hoverEnabled: true
+										onEntered: {
+											parent.color = plasmoid.configuration.bgcolorButtonHover ? plasmoid.configuration.bgcolorButtonHover : Style.bgcolorButtonHover;
+											parent.border.color = plasmoid.configuration.bgcolorBorderHover ? plasmoid.configuration.bgcolorBorderHover : Style.bgcolorBorderHover;
+										}
+										onExited: {
+												parent.color = plasmoid.configuration.bgcolorButton ? plasmoid.configuration.bgcolorButton : Style.bgcolorButton;
+												parent.border.color = plasmoid.configuration.bgcolorButtonBorder ? plasmoid.configuration.bgcolorButtonBorder : Style.bgcolorButtonBorder;
+										}
+										onClicked: parent.parent.clicked()
+									}
+        }
+
+        PlasmaComponents3.ToolTip {
+            id: closeButtonToolTip
+            text: i18nd("plasma_applet_org.kde.plasma.notifications", "Close")
+        }
+
+        Charts.PieChart {
+            id: chart
+            anchors.fill: parent.contentItem
+            anchors.margins: Math.max(Math.floor(PlasmaCore.Units.devicePixelRatio), 1)
+
+            opacity: (notificationHeading.remainingTime > 0 && notificationHeading.remainingTime < notificationHeading.timeout) ? 1 : 0
+            Behavior on opacity {
+                NumberAnimation { duration: PlasmaCore.Units.longDuration }
             }
 
-            PlasmaComponents3.ToolTip {
-                id: closeButtonToolTip
-                text: i18nd("plasma_applet_org.kde.plasma.notifications", "Close")
-            }
+            range { from: 0; to: notificationHeading.timeout; automatic: false }
 
-            Charts.PieChart {
-                id: chart
-                anchors.fill: parent
-                anchors.margins: PlasmaCore.Units.smallSpacing + Math.max(Math.floor(PlasmaCore.Units.devicePixelRatio), 1)
+            valueSources: Charts.SingleValueSource { value: notificationHeading.remainingTime }
+            colorSource: Charts.SingleValueSource { value: PlasmaCore.Theme.highlightColor }
 
-                opacity: (notificationHeading.remainingTime > 0 && notificationHeading.remainingTime < notificationHeading.timeout) ? 1 : 0
-                Behavior on opacity {
-                    NumberAnimation { duration: PlasmaCore.Units.longDuration }
-                }
+            thickness: Math.max(Math.floor(PlasmaCore.Units.devicePixelRatio), 1) * 5
 
-                range { from: 0; to: notificationHeading.timeout; automatic: false }
-
-                valueSources: Charts.SingleValueSource { value: notificationHeading.remainingTime }
-                colorSource: Charts.SingleValueSource { value: PlasmaCore.Theme.highlightColor }
-
-                thickness: Math.max(Math.floor(PlasmaCore.Units.devicePixelRatio), 1) * 5
-
-                transform: Scale { origin.x: chart.width / 2; xScale: -1 }
-            }
+            transform: Scale { origin.x: chart.width / 2; xScale: -1 }
         }
     }
 

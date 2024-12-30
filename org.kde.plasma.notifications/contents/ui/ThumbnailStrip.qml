@@ -16,6 +16,8 @@ import org.kde.kquickcontrolsaddons 2.0 as KQCAddons
 
 import org.kde.plasma.private.notifications 2.0 as Notifications
 
+import "global"
+
 DraggableFileArea {
     id: thumbnailArea
 
@@ -42,7 +44,8 @@ DraggableFileArea {
 
     dragParent: previewPixmap
     dragUrl: thumbnailer.url
-    dragPixmap: thumbnailer.pixmap
+    dragPixmap: thumbnailer.hasPreview ? thumbnailer.pixmap : thumbnailer.iconName
+    dragPixmapSize: previewIcon.height
 
     implicitHeight: Math.max(thumbnailActionRow.implicitHeight + 2 * thumbnailActionRow.anchors.topMargin,
                              Math.round(Math.min(width / 3, width / thumbnailer.ratio)))
@@ -71,7 +74,9 @@ DraggableFileArea {
 
         url: urls[0]
         // height is dynamic, so request a "square" size and then show it fitting to aspect ratio
-        size: Qt.size(thumbnailArea.width, thumbnailArea.width)
+        // Also use popupWidth instead of our width to ensure it is fixed and doesn't
+        // change temporarily during (re)layouting
+        size: Qt.size(Globals.popupWidth, Globals.popupWidth)
     }
 
     KQCAddons.QPixmapItem {
@@ -106,6 +111,7 @@ DraggableFileArea {
         }
 
         PlasmaCore.IconItem {
+            id: previewIcon
             anchors.centerIn: parent
             width: height
             height: PlasmaCore.Units.roundToIconSize(parent.height)

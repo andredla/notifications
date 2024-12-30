@@ -29,6 +29,7 @@ PlasmaCore.Dialog {
 
     property alias summary: notificationItem.summary
     property alias body: notificationItem.body
+    property alias accessibleDescription: notificationItem.accessibleDescription
     property alias icon: notificationItem.icon
     property alias urls: notificationItem.urls
 
@@ -65,6 +66,7 @@ PlasmaCore.Dialog {
     backgroundHints: Style.backgroundHints
     //color: "#FAFAFA" //Style.bgcolor
 
+
     signal configureClicked
     signal dismissClicked
     signal closeClicked
@@ -74,6 +76,7 @@ PlasmaCore.Dialog {
     signal replied(string text)
     signal openUrl(string url)
     signal fileActionInvoked(QtObject action)
+    signal forceActiveFocusRequested
 
     signal expired
     signal hoverEntered
@@ -112,7 +115,7 @@ PlasmaCore.Dialog {
         property bool wantsFocus: false
 
         width: notificationPopup.popupWidth
-        // height: notificationItem.height + notificationItem.y
+        // height: notificationItem.implicitHeight + notificationItem.y
 
         acceptedButtons: Qt.AllButtons
         hoverEnabled: true
@@ -120,8 +123,9 @@ PlasmaCore.Dialog {
         onContainsMouseChanged: wantsFocus = wantsFocus && containsMouse
 
         // André
-        height: (notificationItem.height + notificationItem.y) * (plasmoid.configuration.height ? plasmoid.configuration.height : Style.height)
-
+        height: notificationItem.implicitHeight + (plasmoid.configuration.coordY ? plasmoid.configuration.coordY : Style.coordY)*2
+        // height: (notificationItem.height + notificationItem.y) * (plasmoid.configuration.height ? plasmoid.configuration.height : Style.height)
+        // height: notificationItem.height * (plasmoid.configuration.height ? plasmoid.configuration.height : Style.height)
 			     Rectangle {
 			     	// radius: Style.radius
 			     	radius: plasmoid.configuration.radius
@@ -130,6 +134,24 @@ PlasmaCore.Dialog {
 									// implicitHeight: (notificationItem.implicitHeight + notificationItem.y) * Style.height
 									anchors.fill: parent;
 			     }
+
+        DropArea {
+            anchors.fill: parent
+            onEntered: {
+                if (notificationPopup.hasDefaultAction && !notificationItem.dragging) {
+                    dragActivationTimer.start();
+                } else {
+                    drag.accepted = false;
+                }
+            }
+        }
+
+        Timer {
+            id: dragActivationTimer
+            interval: 250 // same as Task Manager
+            repeat: false
+            onTriggered: notificationPopup.defaultActionInvoked()
+        }
 
         // Visual flourish for critical notifications to make them stand out more
         Rectangle {
@@ -160,10 +182,21 @@ PlasmaCore.Dialog {
             onDismissRequested: popupNotificationsModel.close(popupNotificationsModel.index(index, 0))
 
             cursorShape: hasDefaultAction ? Qt.PointingHandCursor : Qt.ArrowCursor
-            acceptedButtons: hasDefaultAction || draggable ? Qt.LeftButton : Qt.NoButton
+            acceptedButtons: {
+                let buttons = Qt.MiddleButton;
+                if (hasDefaultAction || draggable) {
+                    buttons |= Qt.LeftButton;
+                }
+                return buttons;
+            }
 
             onClicked: {
-                if (hasDefaultAction) {
+                // NOTE "mouse" can be null when faked by the SelectableLabel
+                if (mouse && mouse.button === Qt.MiddleButton) {
+                    if (notificationItem.closable) {
+                        notificationItem.closeClicked();
+                    }
+                } else if (hasDefaultAction) {
                     notificationPopup.defaultActionInvoked();
                 }
             }
@@ -215,17 +248,20 @@ PlasmaCore.Dialog {
 
             NotificationItem {
                 id: notificationItem
-
                 // André
-                x: parent.width * (plasmoid.configuration.coordX ? plasmoid.configuration.coordX : Style.coordX)
-                width: parent.width * (plasmoid.configuration.width ? plasmoid.configuration.width : Style.width)
-                // y: closable || dismissable || configurable ? parent.height * Style.y : 0
+                x: plasmoid.configuration.coordX ? plasmoid.configuration.coordX : Style.coordX
+                y: closable || dismissable || configurable ? (plasmoid.configuration.coordY ? plasmoid.configuration.coordY : Style.coordY) : 0
+                width: parent.width - (plasmoid.configuration.coordX ? plasmoid.configuration.coordX : Style.coordX)*2
+                // x: parent.width * (plasmoid.configuration.coordX ? plasmoid.configuration.coordX : Style.coordX)
+                // x: plasmoid.configuration.coordX ? plasmoid.configuration.coordX : Style.coordX
+                // width: parent.width * (plasmoid.configuration.width ? plasmoid.configuration.width : Style.width)
+                // y: closable || dismissable || configurable ? parent.height * (plasmoid.configuration.coordY ? plasmoid.configuration.coordY : Style.coordY) : 0
+                // y: closable || dismissable || configurable ? (plasmoid.configuration.coordY ? plasmoid.configuration.coordY : Style.coordY) : 0
 
                 // let the item bleed into the dialog margins so the close button margins cancel out
-                y: closable || dismissable || configurable ? -notificationPopup.margins.top : 0
+                // y: closable || dismissable || configurable ? -notificationPopup.margins.top : 0
                 headingRightPadding: -notificationPopup.margins.right
                 // width: parent.width
-                hovered: area.containsMouse
                 maximumLineCount: 8
                 bodyCursorShape: notificationPopup.hasDefaultAction ? Qt.PointingHandCursor : 0
 
@@ -252,6 +288,7 @@ PlasmaCore.Dialog {
                 onReplied: notificationPopup.replied(text)
                 onOpenUrl: notificationPopup.openUrl(url)
                 onFileActionInvoked: notificationPopup.fileActionInvoked(action)
+                onForceActiveFocusRequested: notificationPopup.forceActiveFocusRequested()
 
                 onSuspendJobClicked: notificationPopup.suspendJobClicked()
                 onResumeJobClicked: notificationPopup.resumeJobClicked()
